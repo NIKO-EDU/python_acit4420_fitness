@@ -1,43 +1,59 @@
+"""Run the analyzer from the repository root.
+
+    python3 main.py --profiles data/participants.csv \
+        --sessions data/fitness_sessions.csv data/fitness_sessions_invalid.csv --output output
+"""
+
+import argparse
 import json
 import sys
+from pathlib import Path
 
-from analysis import format_report
-from models import Participant, ReferenceProfile, TrainingSession
-from sample_data import all_scenarios
+from fitness_analyzer.app import FitnessAnalyzerApp
+from fitness_analyzer.exceptions import DataFileError
 
-
-def build_session(scenario):
-    """Turn one scenario dictionary into a TrainingSession object."""
-    info = scenario["participant"]
-    reference = ReferenceProfile.from_generator_profile(info["profile"], age=info["age"])
-    participant = Participant(info["profile"]["participant_id"], reference,
-                              name=info["name"], age=info["age"])
-    return TrainingSession(scenario["session_id"], participant, scenario["observations"])
+DATA_DIR = Path("data")
 
 
-def run_all():
-    """Analyze every scenario and return ``[(title, result_dict), ...]``."""
-    return [(s["title"], build_session(s).analyze()) for s in all_scenarios()]
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Analyze wearable fitness sessions from CSV files.")
+    parser.add_argument("--profiles", type=Path, default=DATA_DIR / "participants.csv",
+                        help="participant profile CSV (default: %(default)s)")
+    parser.add_argument("--sessions", type=Path, nargs="+",
+                        default=[DATA_DIR / "fitness_sessions.csv", DATA_DIR / "fitness_sessions_invalid.csv"],
+                        help="one or more session CSV files (default: the valid and the invalid file)")
+    parser.add_argument("--output", type=Path, default=Path("output"),
+                        help="folder for the reports, created if missing (default: %(default)s)")
+    parser.add_argument("--json", action="store_true", help="also print the result dictionaries as JSON")
+    return parser.parse_args(argv)
 
 
 def main(argv):
-    results = run_all()
-    if "--json" in argv:
-        print(json.dumps([r for _, r in results], indent=2))
-        return
+    args = parse_args(argv)
+    app = FitnessAnalyzerApp(args.profiles, args.sessions, args.output)
+    try:
+        summary = app.run()
+    except DataFileError as error:
+        print(f"Error: cannot use the profile file - {error}", file=sys.stderr)
+        return 1
+    except PermissionError as error:
+        print(f"Error: cannot write the reports to {args.output}: {error.strerror}", file=sys.stderr)
+        return 1
 
-    for title, result in results:
-        print(f"\nScenario: {title}")
-        print(format_report(result))
+    if args.json:
+        print(json.dumps(summary.results, indent=2))
 
-    print("\n" + "=" * 70)
-    print("SUMMARY")
-    print("=" * 70)
-    for title, result in results:
-        c = result["counts"]
-        print(f"{result['session_id']}  {title:<36} {result['classification']:<18} "
-              f"{c['usable']}/{c['received']} usable")
+    print("Analysis complete.")
+    print(f"  Accepted rows    : {summary.accepted_rows}")
+    print(f"  Rejected rows    : {summary.rejected_rows}")
+    print(f"  Sessions analyzed: {len(summary.results)}")
+    for error in summary.file_errors:
+        print(f"  Skipped file     : {error}")
+    print("  Created files:")
+    for path in summary.created_files:
+        print(f"    {path}")
+    return 0
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

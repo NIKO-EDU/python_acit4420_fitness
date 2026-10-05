@@ -1,0 +1,177 @@
+SMART FITNESS SESSION ANALYSIS
+Input files: data/participants.csv, data/fitness_sessions.csv, data/fitness_sessions_invalid.csv
+Max heart rate is estimated with the Tanaka formula and age 35, because the
+profile file has no age. Windows with signal quality below 0.5 are excluded.
+
+======================================================================
+Session FIT-2026-001 - Amina Noor (P001)
+======================================================================
+Source         : fitness_sessions.csv
+Classification : RESTING (normal)
+Windows        : 6 received, 6 usable (6 valid, 0 flagged), 0 excluded
+
+Measurement        n      mean    median       min       max
+heart_rate         6     68.83     69.00     68.00     70.00
+skin_response      6      1.19      1.19      1.17      1.22
+temperature        6     32.43     32.40     32.40     32.50
+activity_level     6      0.09      0.10      0.07      0.12
+signal_quality     6      0.97      0.97      0.96      0.98
+
+Compared with personal reference:
+  mean HR above resting : 0.8 bpm
+  HR reserve mean/median/peak: 0.7% / 0.9% / 1.7%
+  skin response change  : -0.8%
+  temperature change    : 0.03 C
+
+Recovery: no - not detected: peak effort 1.7% HRR (need >= 40.0%); heart rate fell 0.5 bpm in final 2 windows (need >= 15.0); activity fell 0.01 (need >= 0.2); heart rate is not falling at the end of the session
+
+Why:
+  - median heart rate is 0.9% of heart-rate reserve (< 15.0%)
+  - mean activity level is 0.09
+
+======================================================================
+Session FIT-2026-002 - Jonas Berg (P002)
+======================================================================
+Source         : fitness_sessions.csv
+Classification : MODERATE ACTIVITY (normal)
+Windows        : 6 received, 6 usable (6 valid, 0 flagged), 0 excluded
+
+Measurement        n      mean    median       min       max
+heart_rate         6    102.00    104.00     78.00    118.00
+skin_response      6      2.01      2.04      1.55      2.40
+temperature        6     33.13     33.15     32.80     33.40
+activity_level     6      0.49      0.52      0.22      0.68
+signal_quality     6      0.94      0.94      0.93      0.96
+
+Compared with personal reference:
+  mean HR above resting : 28.0 bpm
+  HR reserve mean/median/peak: 25.6% / 27.4% / 40.2%
+  skin response change  : 38.6%
+  temperature change    : 0.43 C
+
+Recovery: no - not detected: heart rate fell -3.0 bpm in final 2 windows (need >= 15.0); activity fell -0.01 (need >= 0.2)
+
+Why:
+  - median heart rate is 27.4% of heart-rate reserve (15.0-40.0%)
+  - mean activity level is 0.49
+
+======================================================================
+Session FIT-2026-003 - Maya Chen (P003)
+======================================================================
+Source         : fitness_sessions.csv
+Classification : HIGH ACTIVITY (normal)
+Windows        : 6 received, 6 usable (6 valid, 0 flagged), 0 excluded
+
+Measurement        n      mean    median       min       max
+heart_rate         6    132.50    147.00     72.00    162.00
+skin_response      6      3.24      3.75      1.30      4.20
+temperature        6     33.53     33.80     32.50     34.10
+activity_level     6      0.75      0.86      0.25      0.94
+signal_quality     6      0.94      0.94      0.92      0.97
+
+Compared with personal reference:
+  mean HR above resting : 69.5 bpm
+  HR reserve mean/median/peak: 57.7% / 69.7% / 82.2%
+  skin response change  : 194.5%
+  temperature change    : 1.23 C
+
+Recovery: no - not detected: heart rate fell -27.0 bpm in final 2 windows (need >= 15.0); activity fell -0.19 (need >= 0.2)
+
+Why:
+  - median heart rate is 69.7% of heart-rate reserve (>= 40.0%)
+  - mean activity level is 0.75
+  - skin response is 194.5% above baseline (sweating or arousal)
+  - skin temperature is 1.23 C above baseline
+
+======================================================================
+Session FIT-2026-004 - Amina Noor (P001)
+======================================================================
+Source         : fitness_sessions.csv
+Classification : RECOVERING (normal)
+Windows        : 6 received, 6 usable (6 valid, 0 flagged), 0 excluded
+
+Measurement        n      mean    median       min       max
+heart_rate         6    113.17    118.00     72.00    151.00
+skin_response      6      2.58      2.65      1.35      3.90
+temperature        6     33.28     33.35     32.60     33.90
+activity_level     6      0.55      0.56      0.18      0.92
+signal_quality     6      0.96      0.95      0.94      0.97
+
+Compared with personal reference:
+  mean HR above resting : 45.2 bpm
+  HR reserve mean/median/peak: 39.1% / 43.3% / 71.9%
+  skin response change  : 115.0%
+  temperature change    : 0.88 C
+
+Recovery: yes - peak effort 71.9% HRR (need >= 40.0%); heart rate fell 30.2 bpm in final 2 windows (need >= 15.0); activity fell 0.37 (need >= 0.2); heart rate still falling across the final windows
+
+Why:
+  - recovery pattern found: peak effort 71.9% HRR (need >= 40.0%); heart rate fell 30.2 bpm in final 2 windows (need >= 15.0); activity fell 0.37 (need >= 0.2); heart rate still falling across the final windows
+  - skin response is 115.0% above baseline (sweating or arousal)
+
+======================================================================
+Session FIT-2026-005 - Jonas Berg (P002)
+======================================================================
+Source         : fitness_sessions.csv
+Classification : INSUFFICIENT DATA (insufficient data)
+Windows        : 5 received, 0 usable (0 valid, 0 flagged), 5 excluded
+
+Measurement        n      mean    median       min       max
+heart_rate         0         -         -         -         -
+skin_response      0         -         -         -         -
+temperature        0         -         -         -         -
+activity_level     0         -         -         -         -
+signal_quality     0         -         -         -         -
+
+Compared with personal reference:
+  mean HR above resting : -
+  HR reserve mean/median/peak: - / - / -
+  skin response change  : -
+  temperature change    : -
+
+Recovery: no - only 0 usable windows; at least 6 are needed to assess recovery
+
+Why:
+  - only 0 of 5 windows were usable (0%); need at least 4 and 50% of the session
+
+Data quality issues:
+  - t=0 (fitness_sessions.csv row 26): [excluded] signal quality 0.34 is below 0.5
+  - t=1 (fitness_sessions.csv row 27): [excluded] signal quality 0.29 is below 0.5
+  - t=2 (fitness_sessions.csv row 28): [excluded] signal quality 0.25 is below 0.5
+  - t=3 (fitness_sessions.csv row 29): [excluded] signal quality 0.31 is below 0.5
+  - t=4 (fitness_sessions.csv row 30): [excluded] signal quality 0.28 is below 0.5
+
+======================================================================
+Session FIT-2026-101 - Amina Noor (P001)
+======================================================================
+Source         : fitness_sessions_invalid.csv
+Classification : INSUFFICIENT DATA (insufficient data)
+Windows        : 1 received, 1 usable (1 valid, 0 flagged), 0 excluded
+
+Measurement        n      mean    median       min       max
+heart_rate         1     72.00     72.00     72.00     72.00
+skin_response      1      1.30      1.30      1.30      1.30
+temperature        1     32.50     32.50     32.50     32.50
+activity_level     1      0.10      0.10      0.10      0.10
+signal_quality     1      0.96      0.96      0.96      0.96
+
+Compared with personal reference:
+  mean HR above resting : 4.0 bpm
+  HR reserve mean/median/peak: 3.5% / 3.5% / 3.5%
+  skin response change  : 8.3%
+  temperature change    : 0.10 C
+
+Recovery: no - only 1 usable windows; at least 6 are needed to assess recovery
+
+Why:
+  - only 1 of 1 windows were usable (100%); need at least 4 and 50% of the session
+
+======================================================================
+SUMMARY
+======================================================================
+FIT-2026-001  Amina Noor   resting            normal             6/6 usable
+FIT-2026-002  Jonas Berg   moderate activity  normal             6/6 usable
+FIT-2026-003  Maya Chen    high activity      normal             6/6 usable
+FIT-2026-004  Amina Noor   recovering         normal             6/6 usable
+FIT-2026-005  Jonas Berg   insufficient data  insufficient data  0/5 usable
+FIT-2026-101  Amina Noor   insufficient data  insufficient data  1/1 usable

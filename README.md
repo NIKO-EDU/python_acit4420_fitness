@@ -1,145 +1,137 @@
 # Smart Fitness Session Analyzer
 
-**Selected option:** Option A: Smart Fitness Session Analyzer
+**Selected option:** Option A: Smart Fitness Session Analyzer (Assignment II, continued from Assignment I)
 
-**Student name:** Nikolai Fjeld Hansen 
-**Student number:** 403201 
+**Student name:** Nikolai Fjeld Hansen
+**Student number:** 403201
 
 ## Description
 
-A console program that analyzes simulated wearable-device data from training
-sessions. For each session it:
+In Assignment I the program analyzed simulated sessions from the data generator. Assignment II builds on the same classes and analysis, but the data now comes from CSV files. For each run it:
 
-1. builds a participant with personal reference values (resting heart rate, estimated maximum heart rate, baseline skin response and temperature)
-2. validates every observation window and marks it **valid**, **flagged** (usable with a warning) or **rejected** (excluded);
-3. calculates summaries (count, mean, median, min, max) for every measurement
-4. compares the session with the participant's reference values
-5. checks whether heart rate and activity fall near the end (recovery)
-6. classifies the session as *resting*, *moderate activity*, *high acivity*,
-   *recovering* or *insuficient dta*, and explains why; and
-7. returns everything as a dictionary and prints a readable report.
+1. loads the participant profiles and the session files with the `csv` module;
+2. checks the identifiers with regular expressions, converts the values to numbers and rejects rows that can't be used, logging the file, row, field and reason for each one;
+3. groups the rows into sessions by `session_id` and connects each session to its participant;
+4. analyzes every session the same way as in A1: summaries, comparison with the personal baseline, recovery check and classification;
+5. gives each session an overall status: **normal**, **unusual** or **insufficient data**;
+6. writes `analysis_summary.csv`, `analysis_report.txt` and `rejected_records.txt` to the output folder.
+
+## How to run
+
+Only the standard library is needed (Python 3.8+). Run it from the repository root:
+
+```bash
+python3 main.py --profiles data/participants.csv \
+    --sessions data/fitness_sessions.csv data/fitness_sessions_invalid.csv \
+    --output output
+```
+
+Every argument has a default, so plain `python3 main.py` does the same thing. The output folder is created if it doesn't exist. The files are overwritten on every run and contain no timestamps, so running it again gives the same output. `--json` also prints the result dictionaries.
+
+```
+Analysis complete.
+  Accepted rows    : 30
+  Rejected rows    : 10
+  Sessions analyzed: 6
+  Created files:
+    output/analysis_summary.csv
+    output/analysis_report.txt
+    output/rejected_records.txt
+```
+
+Tests: `python3 -m unittest -v`
 
 ## Files
 
 ```
-main.py            runs all the scenarios and prints the reports
-models.py          the classes
-analysis.py        the standalone functions (calculations, classification, report)
-sample_data.py     the 8 scenarios (5 from the generator + 3 I made myself)
-data_generator.py  the generator we got for Option A (not changed)
-tests.py           tests
-requirements.txt   empty, only standard library
+main.py                       command line (argparse), prints the completion summary
+fitness_analyzer/
+    models.py                 the classes from A1 (ReferenceProfile, Participant, RangeRule,
+                              SignalQualityRule, Observation, TrainingSession)
+    analysis.py               the functions from A1 (summaries, HRR, recovery, classification, report)
+    validation.py             regex checks for the IDs and file names, CSV text -> numbers
+    exceptions.py             custom exceptions
+    loader.py                 reads the CSV files and builds participants and sessions
+    reports.py                writes the three output files
+    app.py                    ties the loader, the sessions and the report writer together
+data/                         the official CSV files (not changed)
+tests/                        unittest tests
+data_generator.py             the A1 generator, now only used by a test that checks the thresholds
 ```
 
-I split it into `models.py` and `analysis.py` so the calculations are just normal functions that are easy to test without making objects.
+## What changed from Assignment I
 
-## Classes
+- **Package:** `models.py` and `analysis.py` moved into `fitness_analyzer/`, and new modules were added for loading, validation, exceptions and reports. `sample_data.py` was removed because the data now comes from CSV.
+- **Validation:**
+  - `RangeRule.check()` now raises `InvalidRecordError` for impossible values, so the whole row gets rejected.
+  - The new `assess()` method decides whether a valid value is ok, flagged or excluded.
+  - `SignalQualityRule` overrides `assess()`, the same way it overrode `check()` before.
+  - `Observation` collects every problem in a row before raising, so the report shows all of them at once.
+- **Identifiers:** `Participant` and `TrainingSession` validate their IDs with regex (`^P\d{3}$` and `^FIT-\d{4}-\d{3}$`) and raise `InvalidIdentifierError`.
+- **Rejected vs excluded:** a *rejected* row is invalid and isn't used anywhere. An *excluded* window is a valid row with poor signal: it is counted in the session but not used in the calculations. Duplicate or out-of-order timestamps now reject the row.
+- **Normal vs unusual:**
+  - The "notes" from A1 are now a separate function, `find_unusual_patterns()`, and `session_status()` turns the result into normal, unusual or insufficient data.
+  - Raised heart rate while barely moving counts as unusual. So does movement with no heart-rate response.
+  - Raised skin response or temperature only counts as unusual at rest; during exercise it's expected.
+- **Profiles:** `ReferenceProfile.from_generator_profile` became `from_profile` and works with a CSV row. The CSV has no age, so max HR uses the default age of 35.
+- **Fixed:** the recovery explanation printed "heart rate still falling" even when that check had failed.
 
-- `ReferenceProfile` - the participant's baseline values (resting HR, max HR, skin response, temperature)
-- `Participant` - a person, has a `ReferenceProfile`
-- `RangeRule` - checks that a value exists, is a number and is inside a range. returns ok, flag or reject
-- `SignalQualityRule` - subclass of `RangeRule`, rejects signal quality under 0.5 and flags under 0.7
-- `Observation` - one window of data, validates itself when it's created
-- `TrainingSession` - a participant + a list of observations. `analyze()` returns the result as a dict
+## Rules
 
-### OOP stuff
+**Validation (a broken rule rejects the row)**
 
-- **Composition:** `TrainingSession` has a `Participant` and a list of `Observation`s, and `Participant` has a `ReferenceProfile`
-- **Encapsulation:** `participant_id` is read only (property), `reference` has a setter that only accepts a `ReferenceProfile`. `Observation` keeps its status and issues private and you can only change them with `flag()` and `reject()`. The session gives out its observations as a tuple so you have to use `add_observation()` which runs the checks
-- **Inheritance/overriding:** `SignalQualityRule` overrides `check()`. It calls `super().check()` first for the normal range check and then adds the quality limits. Signal quality is a range rule with extra rules so inheritance made sense here, the rest is "has a" so I used composition there
-- **Class/static method:** `ReferenceProfile.from_generator_profile()` is a classmethod that makes a profile from the generator's dict. `estimate_max_heart_rate()` is a staticmethod because it's just a formula and doesn't need an object
-- **Functions:** `summarize`, `heart_rate_reserve_percent`, `compare_with_reference`, `detect_recovery`, `classify_session`, `describe_physiology`, `format_value`, `format_report`
+| Field | Rule |
+|---|---|
+| row | exactly 8 fields (5 in the profile file) |
+| `session_id` | `FIT-YYYY-NNN`, full match |
+| `participant_id` | `P` + 3 digits, full match, and must be in `participants.csv` |
+| `timestamp` | whole number, 0 or more, increasing within a session |
+| `heart_rate` | required, 30-220 bpm |
+| `activity_level` | required, 0-1 |
+| `skin_response` | optional, 0-30 (missing = flagged) |
+| `temperature` | optional, 20-42 C (missing = flagged) |
+| `signal_quality` | required, 0-1 |
+| profile | name required, baseline HR 30-120, skin response above 0, temperature 25-40 |
 
-## Assumptions and rules
+All the ranges include both ends. Text that isn't a number, NaN and infinity are rejected. A session keeps the participant from its first row, so a later row with another participant is rejected.
 
-**Validation**
+**Signal quality (a data-quality issue, not an invalid row)**: below 0.5 the window is excluded from the analysis, and below 0.7 it is flagged but still used. Excluded windows are listed in their session in the report and in their own section of `rejected_records.txt`.
 
-- timestamp has to be 0 or more and go up, duplicates get rejected
-- heart rate is required, 30-220 bpm
-- activity level is required, 0-1
-- skin response and temperature are optional, if they're missing the window just gets flagged
-- signal quality under 0.5 = rejected, under 0.7 = flagged
-- heart rate over the estimated max gets flagged
-- text, booleans, NaN and records that aren't dicts get rejected
+**Classification** (same as A1, checked in this order)
 
-Flagged windows are still used, rejected ones are just counted and listed in the report.
+1. **insufficient data**: fewer than 4 usable windows, or less than half the windows usable.
+2. **recovering**: at least 6 windows, and when the last third is compared with the rest, peak effort was at least 40% HRR, HR dropped 15+ bpm, activity dropped 0.2+, and HR is still going down at the end.
+3. Otherwise it is based on the median % of heart-rate reserve: under 15% = resting, 15-40% = moderate activity, 40%+ = high activity.
 
-**Heart rate.** The generator only gives resting heart rate, so I estimate max HR from age with the Tanaka formula (208 - 0.7 * age). The ages are set in `sample_data.py`, default is 35. Then I use % of heart rate reserve: `(HR - resting) / (max - resting) * 100` so people with different fitness can be compared.
+Max HR is estimated with the Tanaka formula (208 - 0.7 × age, using age 35), and HRR % = (HR - resting) / (max - resting) × 100.
 
-**Classification** (checked in this order)
+**Status**: insufficient data if the label is insufficient data, unusual if `find_unusual_patterns()` found anything, and normal otherwise.
 
-1. **insufficient data** - less than 4 usable windows or less than half the windows usable
-2. **recovering** - at least 6 windows, and comparing the last third with the rest: peak effort was at least 40% HRR, HR dropped 15+ bpm, activity dropped 0.2+, and HR is still going down at the end
-3. otherwise based on the median % HRR (median so one weird spike doesn't change it):
-   - under 15% = resting
-   - 15-40% = moderate activity
-   - 40%+ = high activity
+## Error handling
 
-I picked the thresholds by testing against the generator, they're not from any medical source. I ran 500 seeds per scenario and got basically 99-100% right (recovery drops to ~91% with only 8 windows).
+- `InvalidIdentifierError`, `InvalidRecordError` and `UnknownParticipantError` cover problems in a single row. They are all `ValueError`s and carry a list of `(field, reason)` pairs. The loader catches them for each row, logs the row and moves on to the next one.
+- `UnknownParticipantError` is raised when looking up the participant gives a `KeyError`.
+- `DataFileError` covers a whole file. `FileNotFoundError`, `PermissionError`, `IsADirectoryError`, `UnicodeDecodeError` and `csv.Error` are caught where the file is opened and raised again with the file name. A wrong or empty header is also a `DataFileError`.
+- A broken session file is listed in `rejected_records.txt` and the other files still run. A broken profile file stops the program with exit code 1, because no session can be checked without it.
+- There is no bare `except` and no `except Exception`.
 
-The report also adds a note if HR is high but you're barely moving (stress, heat, sensor fault?), if skin response is 50%+ over baseline, or if temperature is 1 C+ off baseline.
-
-## How to run
-
-No packages needed, only standard library (Python 3.8+), so no venv.
-
-```bash
-git clone https://github.com/NIKO-EDU/python_acit4420_fitness.git
-cd python_acit4420_fitness
-python3 main.py
-```
-
-On Windows use `python` instead of `python3`. You can also do `python3 main.py --json` to get the result dicts as JSON, and `python3 tests.py` to run the tests.
-
-## Example output
-
-Recovery scenario + the summary at the end:
+## Results on the official data
 
 ```
-Scenario: recovery
-======================================================================
-Session S04 - Jonas (P004)
-======================================================================
-Classification : RECOVERING
-Windows        : 12 received, 12 usable (12 valid, 0 flagged), 0 rejected
-
-Measurement        n      mean    median       min       max
-heart_rate        12    106.67    107.00        75       137
-skin_response     12      2.17      2.17      1.81      2.39
-temperature       12     32.96     32.95     32.79     33.25
-activity_level    12      0.48      0.48      0.06      0.88
-signal_quality    12      0.92      0.92      0.87      0.99
-
-Compared with personal reference:
-  mean HR above resting : 35.7 bpm
-  HR reserve mean/median/peak: 31.7% / 32.0% / 58.7%
-  skin response change  : 21.9%
-  temperature change    : 0.27 C
-
-Recovery: yes - peak effort 58.7% HRR (need >= 40.0%); heart rate fell 30.6 bpm in final 4 windows (need >= 15.0); activity fell 0.44 (need >= 0.2); heart rate still falling across the final windows
-
-...
-
-======================================================================
-SUMMARY
-======================================================================
-S01  resting                              resting            12/12 usable
-S02  moderate activity                    moderate activity  12/12 usable
-S03  high activity                        high activity      12/12 usable
-S04  recovery                             recovering         12/12 usable
-S05  poor quality                         insufficient data  0/12 usable
-S06  raised heart rate without movement   moderate activity  8/8 usable
-S07  mixed quality with invalid records   moderate activity  6/10 usable
-S08  too few windows                      insufficient data  3/3 usable
+FIT-2026-001  Amina Noor   resting            normal             6/6 usable
+FIT-2026-002  Jonas Berg   moderate activity  normal             6/6 usable
+FIT-2026-003  Maya Chen    high activity      normal             6/6 usable
+FIT-2026-004  Amina Noor   recovering         normal             6/6 usable
+FIT-2026-005  Jonas Berg   insufficient data  insufficient data  0/5 usable
+FIT-2026-101  Amina Noor   insufficient data  insufficient data  1/1 usable
 ```
 
-S01-S05 are the 5 required ones from the generator. S06-S08 are extra ones I made: high heart rate without moving, a session with a bunch of broken records mixed in, and one that's too short.
+10 of the 11 rows in `fitness_sessions_invalid.csv` are rejected. FIT-2026-005 is valid data, but every window has signal quality below 0.5. FIT-2026-101 only has one valid row left. The FIT-2026-102 rows are all rejected, so that session doesn't appear.
 
 ## Limitations
 
-- max HR is just an estimate from age, real max can be 10-15 bpm off
-- the thresholds are tuned for the fake data, not tested on real people
-- recovery detection needs 6+ windows and is less reliable on short sessions
-- one label per session, so something like interval training just gets the median
-- skin response and temperature only add notes, they don't change the label
-- timestamps are just treated as order, gaps aren't detected
+- max HR is only an estimate, and since the CSV has no age everyone gets age 35
+- the thresholds were tuned on the simulated data, not on real people
+- the official sessions are short (5-6 windows), which is only just enough for the recovery check
+- each session gets one label, so something like interval training just gets the median
+- timestamps are only treated as order, gaps aren't detected

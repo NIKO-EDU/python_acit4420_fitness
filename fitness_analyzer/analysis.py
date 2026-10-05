@@ -1,3 +1,5 @@
+"""Calculations, classification and the text report for one session."""
+
 import statistics
 
 # --- Classification thresholds (explained in README.md) --------------------
@@ -12,6 +14,11 @@ RECOVERY_MIN_ACTIVITY_DROP = 0.2
 LOW_ACTIVITY = 0.3
 HIGH_ACTIVITY = 0.5
 SKIN_RESPONSE_NOTABLE_CHANGE = 50.0   # percent above personal baseline
+TEMPERATURE_NOTABLE_CHANGE = 1.0      # degrees C away from personal baseline
+
+STATUS_NORMAL = "normal"
+STATUS_UNUSUAL = "unusual"
+STATUS_INSUFFICIENT = "insufficient data"
 
 
 def summarize(values):
@@ -88,7 +95,8 @@ def detect_recovery(heart_rates, activity_levels, resting_heart_rate, max_heart_
          f"heart rate fell {hr_drop} bpm in final {tail_size} windows (need >= {RECOVERY_MIN_HR_DROP})"),
         (activity_drop >= RECOVERY_MIN_ACTIVITY_DROP,
          f"activity fell {activity_drop} (need >= {RECOVERY_MIN_ACTIVITY_DROP})"),
-        (still_falling, "heart rate still falling across the final windows"),
+        (still_falling, "heart rate still falling across the final windows" if still_falling
+         else "heart rate is not falling at the end of the session"),
     ]
     result["detected"] = all(passed for passed, _ in checks)
     failed = [text for passed, text in checks if not passed]
@@ -127,12 +135,37 @@ def classify_session(usable_count, received_count, comparison, mean_activity, re
         reasons.append(f"median heart rate is {hrr}% of heart-rate reserve (>= {MODERATE_MAX_HRR}%)")
 
     reasons.append(f"mean activity level is {mean_activity:.2f}")
-    if label != "resting" and mean_activity < LOW_ACTIVITY:
-        reasons.append("note: heart rate is raised while movement is low - possible stress, "
-                       "heat, illness or a sensor fault")
-    elif label == "resting" and mean_activity >= HIGH_ACTIVITY:
-        reasons.append("note: movement is high but heart rate stays low - check the heart-rate sensor")
     return label, reasons
+
+
+def find_unusual_patterns(label, mean_activity, comparison):
+    """Return the things that don't fit the label (an empty list means a normal session).
+
+    Raised skin response and temperature are expected during exercise, so
+    they only count as unusual in a resting session.
+    """
+    findings = []
+    if label in ("moderate activity", "high activity") and mean_activity < LOW_ACTIVITY:
+        findings.append("heart rate is raised while movement is low - possible stress, "
+                        "heat, illness or a sensor fault")
+    elif label == "resting" and mean_activity >= HIGH_ACTIVITY:
+        findings.append("movement is high but heart rate stays low - check the heart-rate sensor")
+    if label == "resting":
+        skin = comparison["skin_response_change_pct"]
+        if skin is not None and skin >= SKIN_RESPONSE_NOTABLE_CHANGE:
+            findings.append(f"skin response is {skin}% above baseline without exercise")
+        temp = comparison["temperature_change"]
+        if temp is not None and abs(temp) >= TEMPERATURE_NOTABLE_CHANGE:
+            direction = "above" if temp > 0 else "below"
+            findings.append(f"skin temperature is {abs(temp)} C {direction} baseline without exercise")
+    return findings
+
+
+def session_status(label, unusual):
+    """Overall result: insufficient data, unusual or normal."""
+    if label == "insufficient data":
+        return STATUS_INSUFFICIENT
+    return STATUS_UNUSUAL if unusual else STATUS_NORMAL
 
 
 def describe_physiology(comparison):
@@ -142,7 +175,7 @@ def describe_physiology(comparison):
     if skin is not None and skin >= SKIN_RESPONSE_NOTABLE_CHANGE:
         notes.append(f"skin response is {skin}% above baseline (sweating or arousal)")
     temp = comparison["temperature_change"]
-    if temp is not None and abs(temp) >= 1.0:
+    if temp is not None and abs(temp) >= TEMPERATURE_NOTABLE_CHANGE:
         direction = "above" if temp > 0 else "below"
         notes.append(f"skin temperature is {abs(temp)} C {direction} baseline")
     return notes
@@ -166,9 +199,10 @@ def format_report(result):
         f"Session {result['session_id']} - {result['participant']['name']} "
         f"({result['participant']['participant_id']})",
         "=" * 70,
-        f"Classification : {result['classification'].upper()}",
+        f"Source         : {', '.join(result['source_files']) or '-'}",
+        f"Classification : {result['classification'].upper()} ({result['status']})",
         f"Windows        : {counts['received']} received, {counts['usable']} usable "
-        f"({counts['valid']} valid, {counts['flagged']} flagged), {counts['rejected']} rejected",
+        f"({counts['valid']} valid, {counts['flagged']} flagged), {counts['excluded']} excluded",
         "",
         f"{'Measurement':<16}{'n':>4}{'mean':>10}{'median':>10}{'min':>10}{'max':>10}",
     ]
@@ -192,8 +226,12 @@ def format_report(result):
         "Why:",
     ]
     lines += [f"  - {reason}" for reason in result["explanation"]]
+    if result["unusual"]:
+        lines += ["", "Unusual:"]
+        lines += [f"  - {finding}" for finding in result["unusual"]]
     if result["issues"]:
-        lines += ["", "Data issues:"]
-        lines += [f"  - t={issue['timestamp']}: [{issue['status']}] {issue['message']}"
+        lines += ["", "Data quality issues:"]
+        lines += [f"  - t={issue['timestamp']} ({issue['source'] or 'no source'}): "
+                  f"[{issue['status']}] {issue['message']}"
                   for issue in result["issues"]]
     return "\n".join(lines)
